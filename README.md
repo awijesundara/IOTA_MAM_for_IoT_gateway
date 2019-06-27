@@ -1,2 +1,4 @@
-# IOTA-MAM-for-IoT-gateway
-IOTA-based secure device management framework for smart home IoT
+node-app-template
+=================
+
+Simple NodeJs application template using Bootstrap
