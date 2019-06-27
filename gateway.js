@@ -1,4 +1,4 @@
-//SmartHome Gateway Firmware v0.2 | 25/06/2019
+//SmartHome Gateway Firmware v0.2 | 27/06/2019
 
 //Successfully subscribe to Vendors channel
 //Successfully recieves firmware information
@@ -26,8 +26,8 @@ var mqtt = require('mqtt');
 var  client = mqtt.connect({
         host: '127.0.0.1',
         port: 1883,
-        username: 'iot',
-        password: 'iot'
+        username: '',
+        password: ''
     });
 
 crypto.getHashes() 
@@ -62,7 +62,6 @@ var sourceFile = require('./next.root'); //Read the next root of Tangle
 console.log("Current Root --> "+sourceFile.nextroot);//Print the value for verification
 
 let root = sourceFile.nextroot //Read the root from sourceFile
-//let root = 'MNRXFSNSCICZZBVFKHLERXUFEQDQWCFCRKYDCXWNRRMIAAVMVYHTFZVVNDKXWAWELERUMWQROQDUVDKWF';
 let key;
 
 // Initialise MAM State
