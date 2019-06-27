@@ -1,10 +1,8 @@
-//SmartHome Gateway Firmware v0.2 | 27/06/2019
+/*
+SmartHome Gateway Firmware v0.2 | 27/06/2019
+Anushka Wijesundara | MIT licenced | IOTA MAM Gateway for IoT
 
-//Successfully subscribe to Vendors channel
-//Successfully recieves firmware information
-//Successfully download firmware file and save according to device.list file
-//Successfully verify firmware files with recieved informationy
-//Successfully publish MQTT messages
+*/
 
 const express = require('express');
 const app = express();
