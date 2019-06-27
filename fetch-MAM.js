@@ -16,8 +16,6 @@ var sourceFile = require('./next.root');
 console.log(sourceFile.nextroot);
 
 // Init State
-// INSERT THE ROOT IN HERE!
-//let root = 'MMQZNGIOKUZNWFAMIHA9XCCYURRR9YNCHGC9MEWNSNDVVDBDCKLMWZKJOBHWKXVVEAHN9D9FPGGKOUPQK'
 //let root = fs.readFileSync('next.root', 'utf8')
 let root = sourceFile.nextroot
 //console.log(root)
