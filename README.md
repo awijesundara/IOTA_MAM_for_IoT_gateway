@@ -1,2 +1,2 @@
 
-![Test Image 1](scheme)
+![Test Image 1](scheme.png)
