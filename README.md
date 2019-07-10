@@ -1,2 +1,2 @@
 
-![Test Image 1](scheme.png)
+![Overall architecture](scheme.png)
