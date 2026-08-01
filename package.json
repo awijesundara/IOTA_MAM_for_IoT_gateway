@@ -10,7 +10,8 @@
   "scripts": {
     "start": "node gateway.js",
     "fetch": "node fetch-MAM.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --check gateway.js && node --check fetch-MAM.js"
   },
   "repository": {
     "type": "git",
