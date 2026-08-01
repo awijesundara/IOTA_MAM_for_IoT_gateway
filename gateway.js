@@ -1,173 +1,175 @@
 /*
-SmartHome Gateway Firmware v0.2 | 27/06/2019
-Anushka Wijesundara | MIT licenced | IOTA MAM Gateway for IoT
+ * SmartHome Gateway Firmware v0.3
+ * Anushka Wijesundara | MIT licensed | IOTA MAM Gateway for IoT
+ *
+ * Watches an IOTA MAM channel for firmware-update announcements, downloads
+ * the referenced binary, verifies its SHA-256 hash, and republishes the
+ * new firmware version over MQTT so devices on the network can update.
+ */
 
-*/
-
-const express = require('express');
-const app = express();
+const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
+const { promisify } = require('util');
 
-const Mam = require('./lib/mam.client.js');
-const IOTA = require('iota.lib.js');
-var cmd=require('node-cmd');
-var nrc = require('node-run-cmd');
-var download = require('download-file')
-var crypto = require('crypto'),fs = require('fs');
-const Path = require('path');
 const Axios = require('axios');
-const { promisify } = require("util");
+const IOTA = require('iota.lib.js');
+const Mam = require('@iota/mam');
+const mqtt = require('mqtt');
+
 const writeFile = promisify(fs.writeFile);
-var mqtt = require('mqtt');
 
-//MQTT configuration
-var  client = mqtt.connect({
-        host: '127.0.0.1',
-        port: 1883,
-        username: '',
-        password: ''
-    });
+const devices = require('./devices.list'); // Device MAC address(es)
+const sourceFile = require('./next.root'); // Last known MAM channel root
 
-crypto.getHashes() 
+// --- Configuration -------------------------------------------------------
 
-// How to publish JSON array in MQTT
-client.publish('IoT/Wakeup', JSON.stringify({ Smart_Home_Gateway:"Wokeup" }))
+// IOTA full node used to read/write the MAM channel.
+const IOTA_NODE = 'https://tangle.anushkawijesundara.com:443';
 
-//Declare global variables
-global.fw_bin_url; //Download URL from Tangle
-global.fw_bin_local_link; //Downloaded local link
-global.fw_bin_hash; // Hash value from Tangle
-global.fw_bin_version; // Firmware Version from Tangle
+const MAM_MODE = 'public'; // public, private or restricted
+const MAM_SIDEKEY = 'mysecret'; // ASCII only; used only in restricted mode
 
-// Declare IOTA Full nodes here;
-//const iota = new IOTA({ provider: 'https://nodes.devnet.iota.org:443' });
-//const iota = new IOTA({ provider: 'https://remote.iprocessing.tech:14267' });
-//const iota = new IOTA({ provider: 'https://knobbys-node-3.ddns.net:14267' });
-//const iota = new IOTA({ provider: 'http://mandelhost.de:14265' });
-//const iota = new IOTA({ provider: 'https://knobbys-node-3.ddns.net:14267' });
-//const iota = new IOTA({ provider: 'https://iota.anushkawijesundara.com:443' });
-//const iota = new IOTA({ provider: 'https://nodes.thetangle.org:443' });
-const iota = new IOTA({ provider: 'https://tangle.anushkawijesundara.com:443' });
-//const iota = new IOTA({ provider: 'https://iota.bracken.xyz:14267' });
-//const iota = new IOTA({ provider: 'https://dyn.tangle-nodes.com:443' });
+const FIRMWARE_DIR = '/var/www/html/firmwares/';
 
-const MODE = 'public'; // public, private or restricted
-const SIDEKEY = 'mysecret'; // Enter only ASCII characters. Used only in restricted mode
+const MQTT_OPTIONS = {
+  host: '127.0.0.1',
+  port: 1883,
+  username: '',
+  password: '',
+};
 
-var devices = require('./devices.list'); //Read devices MAC address
+// --- State -----------------------------------------------------------------
 
-var sourceFile = require('./next.root'); //Read the next root of Tangle
-console.log("Current Root --> "+sourceFile.nextroot);//Print the value for verification
+const iota = new IOTA({ provider: IOTA_NODE });
+const mqttClient = mqtt.connect(MQTT_OPTIONS);
 
-let root = sourceFile.nextroot //Read the root from sourceFile
-let key;
+// Firmware metadata populated once a MAM message has been read from the Tangle.
+let firmware = {
+  url: undefined,
+  hash: undefined,
+  version: undefined,
+};
 
-// Initialise MAM State
 let mamState = Mam.init(iota);
-
-// Set channel mode
-if (MODE == 'restricted') {
-    key = iota.utils.toTrytes(SIDEKEY);
-    mamState = Mam.changeMode(mamState, MODE, key);
+if (MAM_MODE === 'restricted') {
+  const sideKey = iota.utils.toTrytes(MAM_SIDEKEY);
+  mamState = Mam.changeMode(mamState, MAM_MODE, sideKey);
 } else {
-    mamState = Mam.changeMode(mamState, MODE);
+  mamState = Mam.changeMode(mamState, MAM_MODE);
 }
 
-//Download binaries
-async function download_bin (fw_url) {  
-  const url = fw_url
-  const path = Path.resolve(__dirname, '/var/www/html/firmwares/', devices.light+'.bin')
-  const writer = fs.createWriteStream(path)
+const root = sourceFile.nextroot;
+const channelKey = null;
+console.log(`Current Root --> ${root}`);
+
+mqttClient.publish('IoT/Wakeup', JSON.stringify({ Smart_Home_Gateway: 'Wokeup' }));
+
+// --- Firmware download & verification ---------------------------------------
+
+/** Downloads the firmware binary referenced by the latest MAM message. */
+async function downloadFirmware(firmwareUrl) {
+  const destination = path.resolve(FIRMWARE_DIR, `${devices.light}.bin`);
+  const writer = fs.createWriteStream(destination);
 
   const response = await Axios({
-    url,
+    url: firmwareUrl,
     method: 'GET',
-    responseType: 'stream'
-  })
+    responseType: 'stream',
+  });
 
-  response.data.pipe(writer)
-
-  return new Promise((resolve, reject) => {
-    writer.on('finish', resolve)
-    writer.on('error', reject)
-  })
-}
-
-//Verify downloaded binaries
-async function bin_verification () {
-  console.log("Begin verification")
-  var hash = await fileHash('/var/www/html/firmwares/'+devices.light+'.bin'); 
-  //console.log("SHA256 value calculated "+hash);
-  if (hash=="Verified"){
-  var version = await fileVersion(devices.light,fw_bin_version);
-  }
-  else{console.log("Version file creation failed due to Hash mismatch !")}
+  response.data.pipe(writer);
 
   return new Promise((resolve, reject) => {
-    writer.on('finish', resolve)
-    writer.on('error', reject)
-  })
-}
-
-//Hash calculation
-async function fileHash(filename, algorithm = 'sha256') {
-  return new Promise((resolve, reject) => {
-    let shasum = crypto.createHash(algorithm);
-    try {
-      let s = fs.ReadStream(filename)
-      s.on('data', function (data) {
-        shasum.update(data)
-      })
-      // making digest
-      s.on('end', function () {
-        const hash = shasum.digest('hex')
-	console.log("SHA256 value calculated "+hash);
-	if (fw_bin_hash==hash){
-	console.log("Verified !");
-	return resolve("Verified");
-	}
-	else{
-        return resolve("Not verified");
-	}
-      })
-    } catch (error) {
-      return reject('calc fail');
-    }
+    writer.on('finish', resolve);
+    writer.on('error', reject);
   });
 }
 
-//Version file creation
-async function fileVersion(device,version){
-console.log("Begin version file creation !")
-await writeFile("/var/www/html/firmwares/"+device+".version",version);
-console.info("Version file created ! ");
-var version_integer = parseInt(version, 10);
-client.publish('IoT/Firmware_Update/in', JSON.stringify({'fw_version':version_integer,'fw_url':version})); // This should be added to async function
+/** Computes the SHA-256 hash of a file and resolves 'Verified' / 'Not verified'. */
+async function fileHash(filename, algorithm = 'sha256') {
+  return new Promise((resolve, reject) => {
+    const shasum = crypto.createHash(algorithm);
+    const stream = fs.createReadStream(filename);
+
+    stream.on('error', () => reject(new Error('calc fail')));
+    stream.on('data', (chunk) => shasum.update(chunk));
+    stream.on('end', () => {
+      const hash = shasum.digest('hex');
+      console.log(`SHA256 value calculated ${hash}`);
+      if (firmware.hash === hash) {
+        console.log('Verified !');
+        resolve('Verified');
+      } else {
+        resolve('Not verified');
+      }
+    });
+  });
 }
 
-const executeDataRetrieval = async function(rootVal, keyVal) {
-    let resp = await Mam.fetch(rootVal, MODE, keyVal, function(data)
-	 {
-        	let json = JSON.parse(iota.utils.fromTrytes(data));
-		console.log(json);
+/** Writes the firmware version file and announces the update over MQTT. */
+async function writeVersionFile(device, version) {
+  console.log('Begin version file creation !');
+  await writeFile(path.join(FIRMWARE_DIR, `${device}.version`), version);
+  console.info('Version file created ! ');
 
-		fw_bin_url=json.file_url;
-		fw_bin_hash=json.file_hash;
-		fw_bin_version=json.firmware_version;
+  const versionInteger = parseInt(version, 10);
+  mqttClient.publish(
+    'IoT/Firmware_Update/in',
+    JSON.stringify({ fw_version: versionInteger, fw_url: version })
+  );
+}
 
-  	});
+/** Verifies the downloaded firmware binary and, if valid, records its version. */
+async function verifyFirmware() {
+  console.log('Begin verification');
+  const result = await fileHash(path.join(FIRMWARE_DIR, `${devices.light}.bin`));
+  if (result === 'Verified') {
+    await writeVersionFile(devices.light, firmware.version);
+  } else {
+    console.log('Version file creation failed due to Hash mismatch !');
+  }
+}
 
-    	executeDataRetrieval(resp.nextRoot, keyVal)
-    		console.log("New Root --> "+resp.nextRoot);
-    		if (root==resp.nextRoot){console.log("No update from Tangle")}
-    		else {
-    			fs.writeFile("next.root", 'module.exports.nextroot = "'+resp.nextRoot +'"', (err) => {
-    				if (err) console.log(err);
-       				console.log("next.root File updated");
-    			});
-    		}
-	}
+// --- MAM channel polling ----------------------------------------------------
 
-executeDataRetrieval(root, key).then(() => {
-        download_bin(fw_bin_url).then(() => {console.log("Binaries downloaded !"); bin_verification().then(()=>{ process.exit();}) });
-        })
+/**
+ * Reads the next MAM message from `rootValue`, stores the firmware metadata
+ * it announces, persists the new channel root, and keeps following the
+ * channel forward.
+ */
+async function pollMamChannel(rootValue, keyValue) {
+  const response = await Mam.fetch(rootValue, MAM_MODE, keyValue, (data) => {
+    const message = JSON.parse(iota.utils.fromTrytes(data));
+    console.log(message);
+
+    firmware = {
+      url: message.file_url,
+      hash: message.file_hash,
+      version: message.firmware_version,
+    };
+  });
+
+  pollMamChannel(response.nextRoot, keyValue);
+
+  console.log(`New Root --> ${response.nextRoot}`);
+  if (root === response.nextRoot) {
+    console.log('No update from Tangle');
+  } else {
+    fs.writeFile(
+      'next.root',
+      `module.exports.nextroot = "${response.nextRoot}"`,
+      (err) => {
+        if (err) console.log(err);
+        console.log('next.root File updated');
+      }
+    );
+  }
+}
+
+pollMamChannel(root, channelKey).then(() => {
+  downloadFirmware(firmware.url).then(() => {
+    console.log('Binaries downloaded !');
+    verifyFirmware().then(() => process.exit());
+  });
+});

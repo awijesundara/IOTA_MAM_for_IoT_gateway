@@ -1,47 +1,52 @@
-const express = require('express');
-const app = express();
-const path = require('path');
+/*
+ * Standalone utility: publish a test packet to a MAM channel, then fetch it
+ * back and print the decoded payload. Useful for verifying connectivity to
+ * the configured IOTA node and the MAM channel state in next.root.
+ */
 
-var Mam = require('./lib/mam.node.js')
-var IOTA = require('iota.lib.js')
-var iota = new IOTA({ provider: `https://tangle.anushkawijesundara.com` })
+const fs = require('fs');
 
-var cmd=require('node-cmd');
-var nrc = require('node-run-cmd');
-var download = require('download-file')
-var crypto = require('crypto'),fs = require('fs')
-crypto.getHashes() 
+const IOTA = require('iota.lib.js');
+const Mam = require('@iota/mam');
 
-var sourceFile = require('./next.root');
-console.log(sourceFile.nextroot);
+const IOTA_NODE = 'https://tangle.anushkawijesundara.com';
 
-// Init State
-//let root = fs.readFileSync('next.root', 'utf8')
-let root = sourceFile.nextroot
-//console.log(root)
-//console.log(newwRoot)
-// Initialise MAM State
-var mamState = Mam.init(iota)
+const iota = new IOTA({ provider: IOTA_NODE });
+const sourceFile = require('./next.root');
 
-// Publish to tangle
-const publish = async packet => {
-  var trytes = iota.utils.toTrytes(JSON.stringify(packet))
-  var message = Mam.create(mamState, trytes)
-  mamState = message.state
-  await Mam.attach(message.payload, message.address)
-  return message.root
+const root = sourceFile.nextroot;
+console.log(root);
+
+let mamState = Mam.init(iota);
+
+/** Publishes a JSON-serializable packet to the MAM channel and returns its root. */
+async function publish(packet) {
+  const trytes = iota.utils.toTrytes(JSON.stringify(packet));
+  const message = Mam.create(mamState, trytes);
+  mamState = message.state;
+  await Mam.attach(message.payload, message.address);
+  return message.root;
 }
 
-// Callback used to pass data out of the fetch
-const logData = data => console.log(JSON.parse(iota.utils.fromTrytes(data)))
-
-const execute = async () => {
-  var resp = await Mam.fetch(root, 'public', null, logData)
-  console.log(resp.nextRoot)
-  fs.writeFile("next.root-fetch", 'module.exports.nextroot = "'+resp.nextRoot +'"', (err) => {
-  if (err) console.log(err);
-  console.log("Successfully Written to File.");
-});
+/** Decodes and logs a MAM message payload. */
+function logData(data) {
+  console.log(JSON.parse(iota.utils.fromTrytes(data)));
 }
 
-execute()
+async function execute() {
+  const response = await Mam.fetch(root, 'public', null, logData);
+  console.log(response.nextRoot);
+
+  fs.writeFile(
+    'next.root-fetch',
+    `module.exports.nextroot = "${response.nextRoot}"`,
+    (err) => {
+      if (err) console.log(err);
+      console.log('Successfully Written to File.');
+    }
+  );
+}
+
+module.exports = { publish };
+
+execute();
