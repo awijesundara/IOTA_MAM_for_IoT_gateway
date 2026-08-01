@@ -28,15 +28,20 @@ const sourceFile = require('./next.root'); // Last known MAM channel root
 const IOTA_NODE = 'https://tangle.anushkawijesundara.com:443';
 
 const MAM_MODE = 'public'; // public, private or restricted
-const MAM_SIDEKEY = 'mysecret'; // ASCII only; used only in restricted mode
+
+// Only used when MAM_MODE is 'restricted'. Never hardcode a real sidekey here --
+// set MAM_SIDEKEY in the environment instead so it can't end up committed to git.
+const MAM_SIDEKEY = process.env.MAM_SIDEKEY || 'mysecret'; // ASCII only
 
 const FIRMWARE_DIR = '/var/www/html/firmwares/';
 
+// MQTT broker credentials, if any, should be supplied via the environment
+// rather than hardcoded so they never land in version control.
 const MQTT_OPTIONS = {
-  host: '127.0.0.1',
-  port: 1883,
-  username: '',
-  password: '',
+  host: process.env.MQTT_HOST || '127.0.0.1',
+  port: Number(process.env.MQTT_PORT) || 1883,
+  username: process.env.MQTT_USERNAME || '',
+  password: process.env.MQTT_PASSWORD || '',
 };
 
 // --- State -----------------------------------------------------------------
@@ -51,16 +56,11 @@ let firmware = {
   version: undefined,
 };
 
-let mamState = Mam.init(iota);
-if (MAM_MODE === 'restricted') {
-  const sideKey = iota.utils.toTrytes(MAM_SIDEKEY);
-  mamState = Mam.changeMode(mamState, MAM_MODE, sideKey);
-} else {
-  mamState = Mam.changeMode(mamState, MAM_MODE);
-}
-
 const root = sourceFile.nextroot;
-const channelKey = null;
+
+// Mam.fetch's decryption key: only needed (and only meaningful) in restricted
+// mode, where it must match the sidekey the publisher used.
+const channelKey = MAM_MODE === 'restricted' ? iota.utils.toTrytes(MAM_SIDEKEY) : null;
 console.log(`Current Root --> ${root}`);
 
 mqttClient.publish('IoT/Wakeup', JSON.stringify({ Smart_Home_Gateway: 'Wokeup' }));
