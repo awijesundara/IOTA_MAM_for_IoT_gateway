@@ -131,3 +131,11 @@ npm run lint
 ## License
 
 MIT — see [`LICENSE`](./LICENSE).
+
+## Background
+
+![Overall architecture](scheme.png)
+
+Originally developed as part of research on firmware authentication and
+update schemes for smart-home IoT devices using distributed ledger
+technology (Anushka Wijesundara, Tokyo Institute of Technology, 2019).
