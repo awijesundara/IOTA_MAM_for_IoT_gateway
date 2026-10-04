@@ -9,6 +9,15 @@ gateway follows that channel, downloads the referenced binary, verifies its
 hash, and announces the new version to devices on the local network over
 MQTT.
 
+[![CI](https://github.com/awijesundara/IOTA_MAM_for_IoT_gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/awijesundara/IOTA_MAM_for_IoT_gateway/actions/workflows/ci.yml)
+[![Last commit](https://img.shields.io/github/last-commit/awijesundara/IOTA_MAM_for_IoT_gateway/master)](https://github.com/awijesundara/IOTA_MAM_for_IoT_gateway/commits/master)
+[![Top language](https://img.shields.io/github/languages/top/awijesundara/IOTA_MAM_for_IoT_gateway)](https://github.com/awijesundara/IOTA_MAM_for_IoT_gateway)
+[![Code size](https://img.shields.io/github/languages/code-size/awijesundara/IOTA_MAM_for_IoT_gateway)](https://github.com/awijesundara/IOTA_MAM_for_IoT_gateway)
+[![License](https://img.shields.io/github/license/awijesundara/IOTA_MAM_for_IoT_gateway)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933?logo=nodedotjs&logoColor=white)](package.json)
+[![IOTA](https://img.shields.io/badge/IOTA-MAM-131F37?logo=iota&logoColor=white)](gateway.js)
+[![MQTT](https://img.shields.io/badge/MQTT-TLS-660066?logo=mqtt&logoColor=white)](gateway.js)
+
 > **Legacy protocol notice.** This project uses IOTA MAM
 > (`@iota/mam` / `iota.lib.js`), which the IOTA Foundation deprecated years
 > ago. MAM's conceptual successor, **IOTA Streams**, was itself later wound
@@ -139,3 +148,14 @@ MIT — see [`LICENSE`](./LICENSE).
 Originally developed as part of research on firmware authentication and
 update schemes for smart-home IoT devices using distributed ledger
 technology (Anushka Wijesundara, Tokyo Institute of Technology, 2019).
+
+## Project statistics
+
+| Metric | Value |
+|---|---|
+| Tracked files | 11 |
+| Lines of code (non-blank) | 205 |
+| Languages | JavaScript 205 |
+| Commits | 34 |
+
+CI installs dependencies from the lockfile, runs ESLint and syntax-checks the gateway and fetch scripts on each push to `master`.
